@@ -1,0 +1,432 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="theme-color" content="#0a0a0f" />
+  <meta name="description" content="Souler Web — Your AI Live Speaker companion that dances to music, listens to your voice, and reacts in real time." />
+
+  <!-- PWA -->
+  <link rel="manifest" href="manifest.json" />
+  <link rel="apple-touch-icon" href="assets/icon-192.png" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Souler" />
+
+  <!-- Tailwind CSS via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            cyber: {
+              bg:    '#0a0a0f',
+              card:  '#12121a',
+              border:'#1e1e2e',
+              neon:  '#00f5ff',
+              pink:  '#ff2d78',
+              purple:'#a855f7',
+              green: '#39ff14',
+              yellow:'#ffd700',
+            }
+          },
+          fontFamily: {
+            mono: ['"Share Tech Mono"', 'monospace'],
+          },
+          boxShadow: {
+            neon:   '0 0 8px #00f5ff, 0 0 20px #00f5ff44',
+            pink:   '0 0 8px #ff2d78, 0 0 20px #ff2d7844',
+            purple: '0 0 8px #a855f7, 0 0 20px #a855f744',
+          }
+        }
+      }
+    };
+  </script>
+
+  <!-- Google Font -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="style.css" />
+  <!-- Inline critical styles: ensure base layout always renders -->
+  <style>
+    html,body{height:100%;width:100%;margin:0;padding:0;background:#0a0a0f;color:#fff;font-family:'Share Tech Mono','Courier New',monospace;overflow:hidden;user-select:none;-webkit-user-select:none}
+    #main-layout{display:flex;flex-direction:column;height:100dvh;height:100vh;width:100vw;position:relative;z-index:10}
+    header{display:flex;align-items:center;justify-content:space-between;padding:.5rem 1rem;border-bottom:1px solid #1e1e2e;background:rgba(18,18,26,.8);flex-shrink:0}
+    #stage{flex:1;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden}
+    footer{background:rgba(18,18,26,.9);border-top:1px solid #1e1e2e;padding:.5rem .75rem;flex-shrink:0}
+    #player-row,#url-row{display:flex;align-items:center;gap:.375rem;margin-bottom:.5rem}
+    #track-info{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.75rem;color:#9ca3af;padding:0 .5rem}
+    #url-input{flex:1;min-width:0}
+    footer>div:last-child{margin-bottom:0;display:grid;grid-template-columns:repeat(4,1fr);gap:.25rem}
+    footer>div:last-child button{width:100%;display:flex;align-items:center;justify-content:center;gap:.25rem;min-width:0;overflow:hidden}
+    #track-info{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.75rem;color:#9ca3af;padding:0 .5rem}
+    #url-input,#chat-input{flex:1;background:#0a0a0f;border:1px solid #1e1e2e;border-radius:.5rem;padding:.375rem .75rem;font-size:.75rem;color:#d1d5db;font-family:inherit;outline:none}
+    button{background:transparent;color:inherit;cursor:pointer;border:1px solid #1e1e2e;border-radius:.5rem;font-family:inherit}
+    canvas{display:block}
+    #upload-overlay{position:absolute;inset:0;z-index:20;display:flex;flex-direction:column;align-items:center;justify-content:center}
+    #upload-hint{display:flex;flex-direction:column;align-items:center;gap:.75rem;padding:1.5rem;border-radius:1rem;border:2px dashed rgba(0,245,255,.4);background:rgba(18,18,26,.6);cursor:pointer}
+    #visualizer{position:absolute;bottom:0;left:0;right:0;display:flex;align-items:flex-end;justify-content:center;gap:1px;padding:0 .5rem .25rem;height:60px;pointer-events:none;z-index:10}
+    #settings-panel,#chat-panel,#perm-overlay{position:fixed;inset:0;z-index:50;display:none;align-items:flex-end;justify-content:center}
+    #settings-panel.flex,#chat-panel.flex,#perm-overlay.flex{display:flex}
+    .settings-content{position:relative;background:#12121a;border:1px solid #1e1e2e;border-radius:1rem 1rem 0 0;width:100%;max-height:85vh;overflow-y:auto;padding:1.25rem;box-shadow:0 25px 50px -12px rgba(0,0,0,.5)}
+    @media(min-width:640px){.settings-content{border-radius:1rem;max-width:28rem}}
+    #settings-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(4px)}
+    #chat-panel{flex-direction:column}
+    #chat-panel>div:last-child{position:relative;background:#12121a;display:flex;flex-direction:column;padding:1rem;margin-top:auto;border-top:1px solid #1e1e2e;min-height:60vh}
+    @media(min-width:640px){#chat-panel>div:last-child{max-height:70vh;width:100%;max-width:28rem;margin:auto auto 0;border-radius:1rem 1rem 0 0}}
+    #chat-messages{flex:1;overflow-y:auto;margin-bottom:.75rem;min-height:200px;max-height:40vh}
+    #toast-container{position:fixed;top:4rem;right:1rem;z-index:100;display:flex;flex-direction:column;gap:.5rem;pointer-events:none}
+    #voice-feedback,#chat-bubble{position:fixed;pointer-events:none}
+    #mode-badge{display:flex;align-items:center;gap:.25rem;font-size:.75rem;padding:.25rem .5rem;border-radius:9999px;border:1px solid #1e1e2e}
+    .glow-neon{text-shadow:0 0 6px #00f5ff,0 0 16px #00f5ff}
+    svg{display:block}
+    #particle-canvas{position:fixed;inset:0;pointer-events:none;z-index:0;opacity:.6}
+    #glow-ring-outer,#glow-ring-inner{position:absolute;border-radius:50%;pointer-events:none}
+    .settings-label{display:block;font-size:.7rem;letter-spacing:.1em;color:#9ca3af;margin-bottom:.375rem;text-transform:uppercase}
+    .settings-input{width:100%;background:#0a0a0f;border:1px solid #1e1e2e;border-radius:.5rem;padding:.5rem .75rem;font-size:.8rem;color:#e5e7eb;font-family:inherit;outline:none}
+    textarea.settings-input{resize:none}
+    #btn-save-settings,#btn-reupload{width:100%;padding:.625rem;border-radius:.75rem;border:1px solid #00f5ff;color:#00f5ff;background:rgba(0,245,255,.1);font-size:.875rem;letter-spacing:.1em;cursor:pointer}
+  </style>
+  <title>Souler Web — AI Live Speaker</title>
+</head>
+<body class="bg-cyber-bg text-white font-mono overflow-hidden select-none" id="app-body">
+
+  <!-- ===== PARTICLE CANVAS (background) ===== -->
+  <canvas id="particle-canvas" class="fixed inset-0 pointer-events-none z-0"></canvas>
+
+  <!-- ===== MAIN LAYOUT ===== -->
+  <div id="main-layout" class="relative z-10 flex flex-col h-screen w-screen">
+
+    <!-- TOP STATUS BAR -->
+    <header class="flex items-center justify-between px-4 py-2 border-b border-cyber-border bg-cyber-card/80 backdrop-blur-md">
+      <div class="flex items-center gap-2">
+        <span class="text-cyber-neon text-lg tracking-widest font-bold glow-neon">SOULER</span>
+        <span class="text-xs text-gray-500 hidden sm:inline">AI LIVE SPEAKER</span>
+      </div>
+
+      <!-- Mode indicator -->
+      <div id="mode-badge" class="flex items-center gap-1 text-xs px-2 py-1 rounded-full border border-cyber-border transition-all duration-500">
+        <span id="mode-dot" class="w-2 h-2 rounded-full bg-gray-500 animate-pulse"></span>
+        <span id="mode-label">IDLE</span>
+      </div>
+
+      <!-- Settings button -->
+      <button id="btn-settings" aria-label="Settings" title="Settings"
+        class="p-2 rounded-lg border border-cyber-border hover:border-cyber-neon hover:shadow-neon transition-all duration-300">
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+        </svg>
+      </button>
+    </header>
+
+    <!-- CHARACTER STAGE -->
+    <main class="flex-1 relative flex items-center justify-center overflow-hidden" id="stage">
+
+      <!-- Reactive glow rings -->
+      <div id="glow-ring-outer" class="glow-ring absolute rounded-full pointer-events-none transition-all duration-100"></div>
+      <div id="glow-ring-inner" class="glow-ring-inner absolute rounded-full pointer-events-none transition-all duration-100"></div>
+
+      <!-- Character canvas -->
+      <canvas id="character-canvas" class="relative z-10 touch-none"
+        style="max-width: 90vmin; max-height: 60vmin; cursor: pointer;"
+        title="Click to upload your character image"></canvas>
+
+      <!-- Upload overlay (shown when no character loaded) -->
+      <div id="upload-overlay" class="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none">
+        <div id="upload-hint" class="flex flex-col items-center gap-3 p-6 rounded-2xl border-2 border-dashed border-cyber-neon/40 bg-cyber-card/60 backdrop-blur-sm cursor-pointer pointer-events-auto transition-all hover:border-cyber-neon hover:shadow-neon"
+          onclick="document.getElementById('file-input').click()">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-12 h-12 text-cyber-neon/60" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+          <span class="text-cyber-neon/80 text-sm text-center">Tap to upload your<br/>character image</span>
+          <span class="text-gray-500 text-xs">PNG · JPG · GIF · WEBP</span>
+        </div>
+      </div>
+
+      <!-- Hidden file input -->
+      <input type="file" id="file-input" accept="image/*" class="hidden" />
+
+      <!-- Beat visualizer bars (bottom of stage) -->
+      <div id="visualizer" class="absolute bottom-0 left-0 right-0 flex items-end justify-center gap-px px-2 pb-1 pointer-events-none z-10" style="height:60px;">
+        <!-- bars injected by JS -->
+      </div>
+
+      <!-- Chat bubble -->
+      <div id="chat-bubble" class="chat-bubble absolute top-4 left-1/2 -translate-x-1/2 hidden z-30
+        bg-cyber-card/90 border border-cyber-purple/60 rounded-2xl px-4 py-2 max-w-xs text-sm text-center
+        text-white shadow-purple backdrop-blur-sm pointer-events-none">
+      </div>
+
+    </main>
+
+    <!-- BOTTOM CONTROL BAR -->
+    <footer class="bg-cyber-card/90 backdrop-blur-md border-t border-cyber-border px-3 py-2">
+
+      <!-- Audio Player Row -->
+      <div id="player-row" style="display:flex;align-items:center;gap:.375rem;margin-bottom:.5rem">
+        <!-- URL / file name display -->
+        <div id="track-info" style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.75rem;color:#9ca3af;padding:0 .5rem">
+          No track loaded
+        </div>
+
+        <!-- Play/Pause -->
+        <button id="btn-play-pause" aria-label="Play/Pause"
+          class="control-btn rounded-lg border border-cyber-neon/40 hover:border-cyber-neon hover:shadow-neon transition-all duration-200"
+          style="flex-shrink:0;padding:.5rem;color:#00f5ff;border-color:rgba(0,245,255,.4)">
+          <svg id="icon-play" xmlns="http://www.w3.org/2000/svg" style="width:1.25rem;height:1.25rem;display:block" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+          <svg id="icon-pause" xmlns="http://www.w3.org/2000/svg" style="width:1.25rem;height:1.25rem;display:none" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+          </svg>
+        </button>
+
+        <!-- Stop -->
+        <button id="btn-stop" aria-label="Stop"
+          class="control-btn rounded-lg border border-cyber-border hover:border-cyber-pink hover:shadow-pink transition-all duration-200"
+          style="flex-shrink:0;padding:.5rem">
+          <svg xmlns="http://www.w3.org/2000/svg" style="width:1.25rem;height:1.25rem;display:block" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M6 6h12v12H6z"/>
+          </svg>
+        </button>
+
+        <!-- Volume -->
+        <input id="volume-slider" type="range" min="0" max="1" step="0.01" value="0.8"
+          style="width:52px;flex-shrink:0;height:4px;appearance:none;-webkit-appearance:none;background:#1e1e2e;border-radius:4px;cursor:pointer;accent-color:#00f5ff" />
+
+        <!-- Load file -->
+        <button id="btn-load-file" aria-label="Load audio file"
+          class="control-btn rounded-lg border border-cyber-border hover:border-cyber-purple hover:shadow-purple transition-all duration-200"
+          style="flex-shrink:0;padding:.5rem">
+          <svg xmlns="http://www.w3.org/2000/svg" style="width:1.25rem;height:1.25rem;display:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" />
+          </svg>
+        </button>
+        <input type="file" id="audio-file-input" accept="audio/*" class="hidden" />
+      </div>
+
+      <!-- URL Input Row -->
+      <div id="url-row" style="display:flex;align-items:center;gap:.375rem;margin-bottom:.5rem">
+        <input id="url-input" type="url" placeholder="Paste audio URL here…"
+          style="flex:1;min-width:0;background:#0a0a0f;border:1px solid #1e1e2e;border-radius:.5rem;padding:.25rem .75rem;font-size:.75rem;color:#d1d5db;font-family:inherit;outline:none" />
+        <button id="btn-load-url" class="control-btn px-3 py-1 rounded-lg border border-cyber-neon/50 text-cyber-neon text-xs hover:shadow-neon transition-all">
+          Load
+        </button>
+      </div>
+
+      <!-- Action Buttons Row -->
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:.25rem">
+
+        <!-- Mic / env listen -->
+        <button id="btn-mic" aria-label="Toggle microphone listening"
+          class="control-btn flex items-center justify-center gap-1 py-1.5 rounded-lg border border-cyber-border text-xs hover:border-cyber-neon hover:shadow-neon transition-all duration-200" style="width:100%;min-width:0;overflow:hidden">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+          </svg>
+          <span id="mic-label">MIC</span>
+        </button>
+
+        <!-- Voice command -->
+        <button id="btn-voice" aria-label="Voice command"
+          class="control-btn flex items-center justify-center gap-1 py-1.5 rounded-lg border border-cyber-border text-xs hover:border-cyber-purple hover:shadow-purple transition-all duration-200" style="width:100%;min-width:0;overflow:hidden">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+          <span>VOICE</span>
+        </button>
+
+        <!-- Idle/Dance toggle -->
+        <button id="btn-mode-toggle" aria-label="Toggle dance/idle mode"
+          class="control-btn flex items-center justify-center gap-1 py-1.5 rounded-lg border border-cyber-border text-xs hover:border-cyber-pink hover:shadow-pink transition-all duration-200" style="width:100%;min-width:0;overflow:hidden">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          <span id="mode-toggle-label">DANCE</span>
+        </button>
+
+        <!-- AI Chat button -->
+        <button id="btn-chat" aria-label="AI Chat"
+          class="control-btn flex items-center justify-center gap-1 py-1.5 rounded-lg border border-cyber-border text-xs hover:border-cyber-yellow hover:text-cyber-yellow transition-all duration-200" style="width:100%;min-width:0;overflow:hidden">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+          </svg>
+          <span>CHAT</span>
+        </button>
+
+      </div>
+    </footer>
+  </div>
+
+  <!-- ===== SETTINGS PANEL ===== -->
+  <div id="settings-panel" class="settings-panel fixed inset-0 z-50 hidden flex items-end sm:items-center justify-center">
+    <!-- Backdrop -->
+    <div id="settings-backdrop" class="absolute inset-0 bg-black/70 backdrop-blur-sm"></div>
+
+    <!-- Panel -->
+    <div class="settings-content relative bg-cyber-card border border-cyber-border rounded-t-2xl sm:rounded-2xl w-full sm:max-w-md max-h-[85vh] overflow-y-auto p-5 shadow-2xl">
+      <div class="flex items-center justify-between mb-5">
+        <h2 class="text-cyber-neon text-lg tracking-widest glow-neon">SETTINGS</h2>
+        <button id="btn-close-settings" class="text-gray-400 hover:text-white transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- API Key -->
+      <div class="settings-group mb-4">
+        <label class="settings-label">OpenAI-Compatible API Key</label>
+        <input id="setting-api-key" type="password" placeholder="sk-… or grok API key"
+          class="settings-input" autocomplete="off" />
+        <p class="text-gray-600 text-xs mt-1">Used for AI voice chat. Stored only in your browser.</p>
+      </div>
+
+      <!-- API Base URL -->
+      <div class="settings-group mb-4">
+        <label class="settings-label">API Base URL</label>
+        <input id="setting-api-base" type="url" placeholder="https://api.openai.com/v1"
+          class="settings-input" />
+      </div>
+
+      <!-- Model -->
+      <div class="settings-group mb-4">
+        <label class="settings-label">Model</label>
+        <input id="setting-model" type="text" placeholder="gpt-4o-mini"
+          class="settings-input" />
+      </div>
+
+      <!-- Volume -->
+      <div class="settings-group mb-4">
+        <label class="settings-label">Master Volume <span id="vol-display" class="text-cyber-neon">80%</span></label>
+        <input id="setting-volume" type="range" min="0" max="1" step="0.01" value="0.8"
+          class="w-full h-1 appearance-none bg-cyber-border rounded-full cursor-pointer accent-cyber-neon" />
+      </div>
+
+      <!-- Beat Sensitivity -->
+      <div class="settings-group mb-4">
+        <label class="settings-label">Beat Sensitivity <span id="sens-display" class="text-cyber-neon">50%</span></label>
+        <input id="setting-sensitivity" type="range" min="0" max="1" step="0.01" value="0.5"
+          class="w-full h-1 appearance-none bg-cyber-border rounded-full cursor-pointer accent-cyber-neon" />
+      </div>
+
+      <!-- Theme -->
+      <div class="settings-group mb-4">
+        <label class="settings-label">Accent Theme</label>
+        <div class="flex gap-3 mt-2">
+          <button class="theme-swatch w-8 h-8 rounded-full border-2 border-transparent transition-all" data-theme="neon"
+            style="background:#00f5ff;" title="Neon Cyan"></button>
+          <button class="theme-swatch w-8 h-8 rounded-full border-2 border-transparent transition-all" data-theme="pink"
+            style="background:#ff2d78;" title="Hot Pink"></button>
+          <button class="theme-swatch w-8 h-8 rounded-full border-2 border-transparent transition-all" data-theme="purple"
+            style="background:#a855f7;" title="Purple"></button>
+          <button class="theme-swatch w-8 h-8 rounded-full border-2 border-transparent transition-all" data-theme="green"
+            style="background:#39ff14;" title="Neon Green"></button>
+          <button class="theme-swatch w-8 h-8 rounded-full border-2 border-transparent transition-all" data-theme="yellow"
+            style="background:#ffd700;" title="Gold"></button>
+        </div>
+      </div>
+
+      <!-- Animation Speed -->
+      <div class="settings-group mb-4">
+        <label class="settings-label">Animation Speed <span id="speed-display" class="text-cyber-neon">1.0x</span></label>
+        <input id="setting-speed" type="range" min="0.3" max="2.0" step="0.1" value="1.0"
+          class="w-full h-1 appearance-none bg-cyber-border rounded-full cursor-pointer accent-cyber-neon" />
+      </div>
+
+      <!-- Character image re-upload -->
+      <div class="settings-group mb-4">
+        <label class="settings-label">Character Image</label>
+        <button id="btn-reupload"
+          class="w-full py-2 mt-1 rounded-lg border border-cyber-border text-sm text-gray-300 hover:border-cyber-neon hover:text-cyber-neon hover:shadow-neon transition-all">
+          Upload New Character
+        </button>
+      </div>
+
+      <!-- AI system prompt -->
+      <div class="settings-group mb-4">
+        <label class="settings-label">AI System Prompt</label>
+        <textarea id="setting-system-prompt" rows="3" placeholder="You are Souler, a friendly AI music companion…"
+          class="settings-input resize-none"></textarea>
+      </div>
+
+      <!-- Save button -->
+      <button id="btn-save-settings"
+        class="w-full py-2.5 rounded-xl bg-cyber-neon/10 border border-cyber-neon text-cyber-neon text-sm tracking-widest hover:bg-cyber-neon/20 hover:shadow-neon transition-all">
+        SAVE SETTINGS
+      </button>
+
+      <p class="text-center text-gray-600 text-xs mt-3">Settings saved locally in your browser</p>
+    </div>
+  </div>
+
+  <!-- ===== AI CHAT PANEL ===== -->
+  <div id="chat-panel" class="fixed inset-0 z-50 hidden flex flex-col">
+    <div class="absolute inset-0 bg-black/60 backdrop-blur-sm"></div>
+    <div class="relative bg-cyber-card flex flex-col h-full sm:h-auto sm:max-h-[70vh] sm:w-full sm:max-w-md sm:mx-auto sm:mt-auto sm:mb-0 sm:rounded-t-2xl border-t border-cyber-border p-4 mt-auto">
+      <div class="flex items-center justify-between mb-3">
+        <h2 class="text-cyber-purple text-base tracking-widest" style="text-shadow:0 0 8px #a855f7">AI CHAT</h2>
+        <button id="btn-close-chat" class="text-gray-400 hover:text-white transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      </div>
+
+      <!-- Messages -->
+      <div id="chat-messages" class="flex-1 overflow-y-auto space-y-3 mb-3 min-h-[200px] max-h-[40vh]">
+        <div class="text-gray-500 text-xs text-center mt-8">Say "chat" or tap the ⚡ button to start talking to Souler.</div>
+      </div>
+
+      <!-- Input row -->
+      <div class="flex gap-2">
+        <input id="chat-input" type="text" placeholder="Type a message…"
+          class="flex-1 bg-cyber-bg border border-cyber-border rounded-lg px-3 py-2 text-sm text-gray-300 placeholder-gray-600
+                 focus:outline-none focus:border-cyber-purple transition-all" />
+        <button id="btn-send-chat"
+          class="px-3 py-2 rounded-lg border border-cyber-purple text-cyber-purple text-xs hover:shadow-purple transition-all">
+          SEND
+        </button>
+        <button id="btn-voice-chat" aria-label="Voice input"
+          class="px-3 py-2 rounded-lg border border-cyber-border text-gray-400 hover:border-cyber-purple hover:text-cyber-purple transition-all">
+          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== TOAST NOTIFICATIONS ===== -->
+  <div id="toast-container" class="fixed top-16 right-4 z-[100] flex flex-col gap-2 pointer-events-none"></div>
+
+  <!-- ===== VOICE COMMAND FEEDBACK ===== -->
+  <div id="voice-feedback" class="fixed bottom-32 left-1/2 -translate-x-1/2 z-40 hidden
+    bg-cyber-card/90 border border-cyber-purple/60 rounded-xl px-5 py-2 text-cyber-purple text-sm
+    text-center shadow-purple backdrop-blur-sm pointer-events-none">
+  </div>
+
+  <!-- ===== PERMISSION OVERLAY ===== -->
+  <div id="perm-overlay" class="fixed inset-0 z-[200] hidden flex items-center justify-center bg-black/80 backdrop-blur-sm">
+    <div class="bg-cyber-card border border-cyber-border rounded-2xl p-6 max-w-sm mx-4 text-center">
+      <div id="perm-icon" class="text-4xl mb-3">🎤</div>
+      <h3 id="perm-title" class="text-white text-base font-bold mb-2">Microphone Access</h3>
+      <p id="perm-message" class="text-gray-400 text-sm mb-4">Souler needs microphone access to listen for music and voice commands.</p>
+      <div class="flex gap-3">
+        <button id="perm-deny" class="flex-1 py-2 rounded-lg border border-cyber-border text-gray-400 text-sm hover:border-white transition-all">
+          Not now
+        </button>
+        <button id="perm-allow" class="flex-1 py-2 rounded-lg bg-cyber-neon/10 border border-cyber-neon text-cyber-neon text-sm hover:bg-cyber-neon/20 hover:shadow-neon transition-all">
+          Allow
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main app script -->
+  <script src="app.js"></script>
+</body>
+</html>
