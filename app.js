@@ -27,7 +27,9 @@
 
 const AppState = {
   mode: 'idle',           // 'idle' | 'dance' | 'music' | 'chat'
-  characterImage: null,   // HTMLImageElement
+  characterImage: null,   // HTMLImageElement | HTMLVideoElement
+  characterMediaType: 'image', // 'image' | 'video'
+  characterObjectURL: null, // temporary object URL for uploaded local character media
   characterImageDataURL: null, // base64 data URL (PNG) for export/import & sharing
   audioContext: null,
   analyser: null,
@@ -125,6 +127,7 @@ const CONFIG = {
   // Character canvas & rendering
   character: {
     maxCanvasSize: 420,
+    maxUploadBytes: 25 * 1024 * 1024, // 25MB
     sizeLandscape: 0.85,
     sizePortrait: 0.75,
     shadowBase: 20,
@@ -363,7 +366,14 @@ function exportCharacterAndSettings() {
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
 
-  showToast('Preset exported (settings + character)', 'success');
+  const hasExportedCharacter = Boolean(payload.character);
+  if (hasExportedCharacter) {
+    showToast('Preset exported (settings + character)', 'success');
+  } else if (AppState.characterMediaType === 'video' && AppState.characterImage) {
+    showToast('Preset exported (settings only). MP4 character is not embedded.', 'info');
+  } else {
+    showToast('Preset exported (settings only)', 'success');
+  }
 }
 
 function importCharacterAndSettings(file) {
@@ -540,22 +550,26 @@ function drawCharacter() {
 
   if (AppState.characterImage) {
     // Draw the uploaded character
-    const img = AppState.characterImage;
-    const imgAspect = img.naturalWidth / img.naturalHeight;
-    const drawW = (imgAspect >= 1) ? w * CONFIG.character.sizeLandscape : w * CONFIG.character.sizePortrait;
-    const drawH = drawW / imgAspect;
+    const media = AppState.characterImage;
+    const mediaWidth = AppState.characterMediaType === 'video' ? media.videoWidth : media.naturalWidth;
+    const mediaHeight = AppState.characterMediaType === 'video' ? media.videoHeight : media.naturalHeight;
+    const safeWidth = mediaWidth || 1;
+    const safeHeight = mediaHeight || 1;
+    const mediaAspect = safeWidth / safeHeight;
+    const drawW = (mediaAspect >= 1) ? w * CONFIG.character.sizeLandscape : w * CONFIG.character.sizePortrait;
+    const drawH = drawW / mediaAspect;
 
     // Shadow / glow
     ctx.shadowColor = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#00f5ff';
     ctx.shadowBlur  = CONFIG.character.shadowBase + energy * CONFIG.character.shadowEnergy;
 
-    ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+    ctx.drawImage(media, -drawW / 2, -drawH / 2, drawW, drawH);
 
     // Beat flash overlay
     if (a.flashAlpha > CONFIG.character.flashThreshold) {
       ctx.globalAlpha = a.flashAlpha * CONFIG.character.flashAlphaMul;
       ctx.fillStyle   = a.flashColor;
-      ctx.drawImage(img, -drawW / 2, -drawH / 2, drawW, drawH);
+      ctx.drawImage(media, -drawW / 2, -drawH / 2, drawW, drawH);
       ctx.globalAlpha = 1;
     }
   } else {
@@ -694,42 +708,74 @@ function drawPlaceholderCharacter(ctx, w, h, energy) {
 }
 
 /**
- * Load image from file or URL into the character slot.
+ * Load character media (image or MP4) from file or URL into the character slot.
  */
-function loadCharacterImage(src) {
-  const img = new Image();
-  img.crossOrigin = 'anonymous';
-  img.onload = () => {
-    AppState.characterImage = img;
+function loadCharacterImage(src, options = {}) {
+  const { isVideo = false, isObjectURL = false } = options;
+  const previousObjectURL = AppState.characterObjectURL;
 
-    // Capture a portable PNG data URL for export/import
-    try {
-      const c = document.createElement('canvas');
-      c.width = img.naturalWidth;
-      c.height = img.naturalHeight;
-      const cx = c.getContext('2d');
-      cx.drawImage(img, 0, 0);
-      AppState.characterImageDataURL = c.toDataURL('image/png');
-    } catch (e) {
+  const media = isVideo ? document.createElement('video') : new Image();
+  media.crossOrigin = 'anonymous';
+
+  const onLoad = () => {
+    if (previousObjectURL && previousObjectURL !== src) {
+      URL.revokeObjectURL(previousObjectURL);
+    }
+    AppState.characterObjectURL = isObjectURL ? src : null;
+    AppState.characterImage = media;
+    AppState.characterMediaType = isVideo ? 'video' : 'image';
+
+    // Capture a portable PNG data URL for export/import (images only)
+    if (!isVideo) {
+      try {
+        const c = document.createElement('canvas');
+        c.width = media.naturalWidth;
+        c.height = media.naturalHeight;
+        const cx = c.getContext('2d');
+        cx.drawImage(media, 0, 0);
+        AppState.characterImageDataURL = c.toDataURL('image/png');
+      } catch (e) {
+        AppState.characterImageDataURL = null;
+      }
+    } else {
       AppState.characterImageDataURL = null;
+      media.play().catch(() => {});
     }
 
     document.getElementById('upload-overlay').style.display = 'none';
 
     // Context-aware success message
-    if (AppState._pendingGifUpload) {
+    if (AppState._pendingCharacterUploadType === 'gif') {
       showToast('GIF loaded — first frame only (no animation)', 'info');
-      AppState._pendingGifUpload = false;
+    } else if (AppState._pendingCharacterUploadType === 'mp4' || isVideo) {
+      showToast('MP4 loaded — loop animation enabled', 'success');
     } else {
       showToast('Character loaded!', 'success');
     }
+    AppState._pendingCharacterUploadType = null;
     triggerFlash();
   };
-  img.onerror = () => {
-    AppState._pendingGifUpload = false;
-    showToast('Failed to load image', 'error');
+
+  media.onerror = () => {
+    if (isObjectURL) {
+      URL.revokeObjectURL(src);
+    }
+    AppState._pendingCharacterUploadType = null;
+    showToast(isVideo ? 'Failed to load MP4 character' : 'Failed to load image', 'error');
   };
-  img.src = src;
+
+  if (isVideo) {
+    media.muted = true;
+    media.loop = true;
+    media.playsInline = true;
+    media.autoplay = true;
+    media.preload = 'auto';
+    media.onloadeddata = onLoad;
+    media.src = src;
+  } else {
+    media.onload = onLoad;
+    media.src = src;
+  }
 }
 
 /* ─────────────────────────────────────────────────
@@ -1477,10 +1523,25 @@ function wireEvents() {
   UI.fileInput.addEventListener('change', (e) => {
     const file = e.target.files[0];
     if (file) {
+      const isMp4 = file.type === 'video/mp4' || file.name.toLowerCase().endsWith('.mp4');
+      const isImage = file.type.startsWith('image/');
       const isGif = file.type === 'image/gif' || file.name.toLowerCase().endsWith('.gif');
+
+      if (!isImage && !isMp4) {
+        showToast('Unsupported character format. Use PNG/JPG/WEBP/GIF or MP4.', 'error');
+        e.target.value = '';
+        return;
+      }
+
+      if (file.size > CONFIG.character.maxUploadBytes) {
+        showToast('Character file is too large (max 25MB).', 'error');
+        e.target.value = '';
+        return;
+      }
+
       // Store temporary flag so loadCharacterImage can show the right message
-      AppState._pendingGifUpload = isGif;
-      loadCharacterImage(URL.createObjectURL(file));
+      AppState._pendingCharacterUploadType = isGif ? 'gif' : (isMp4 ? 'mp4' : null);
+      loadCharacterImage(URL.createObjectURL(file), { isVideo: isMp4, isObjectURL: true });
     }
     e.target.value = '';
   });

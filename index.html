@@ -133,7 +133,7 @@
       <!-- Character canvas -->
       <canvas id="character-canvas" class="relative z-10 touch-none"
         style="max-width: 90vmin; max-height: 60vmin; cursor: pointer;"
-        title="Click to upload your character image (GIFs use first frame)"></canvas>
+        title="Click to upload your character image or MP4 (GIFs use first frame)"></canvas>
 
       <!-- Upload overlay (shown when no character loaded) -->
       <div id="upload-overlay" class="absolute inset-0 z-20 flex flex-col items-center justify-center pointer-events-none">
@@ -143,12 +143,12 @@
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
           </svg>
           <span class="text-cyber-neon/80 text-sm text-center">Tap to upload your<br/>character image</span>
-          <span class="text-gray-500 text-xs">PNG · JPG · WEBP · GIF (first frame only)</span>
+          <span class="text-gray-500 text-xs">PNG · JPG · WEBP · GIF (first frame) · MP4 (loop)</span>
         </div>
       </div>
 
       <!-- Hidden file input -->
-      <input type="file" id="file-input" accept="image/*" class="hidden" />
+      <input type="file" id="file-input" accept="image/*,video/mp4,.mp4" class="hidden" />
 
       <!-- Beat visualizer bars (bottom of stage) -->
       <div id="visualizer" class="absolute bottom-0 left-0 right-0 flex items-end justify-center gap-px px-2 pb-1 pointer-events-none z-10" style="height:60px;">

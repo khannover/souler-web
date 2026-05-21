@@ -12,7 +12,7 @@
 
 | Feature | Description |
 |---|---|
-| 🖼️ **Custom Character** | Upload any PNG/JPG/GIF/WEBP image — it becomes your animated companion |
+| 🖼️ **Custom Character** | Upload PNG/JPG/GIF/WEBP images or an MP4 clip — it becomes your animated companion |
 | 🕺 **Dance Mode** | Real-time beat-reactive bouncing, swaying, scaling, and rotation |
 | 😴 **Idle Mode** | Gentle breathing, floating, and eye-blinking animation |
 | 🎶 **Music Reactive** | Web Audio API beat/energy detection drives all animations and particle effects |
@@ -79,8 +79,9 @@ Then visit **http://localhost:8080** in your browser.
 
 ### 1. Upload Your Character
 - Tap the **upload area** in the center of the screen, or tap the character canvas
-- Choose any PNG, JPG, GIF, or WEBP image
+- Choose PNG, JPG, GIF, WEBP, or MP4
 - Your image immediately becomes the animated character!
+- MP4 files play as a looping animated character
 - To change it: go to **Settings → Upload New Character**
 
 ### 2. Play Music
@@ -181,6 +182,7 @@ Works great with:
 - Transparent PNG stickers
 - Your own photo!
 - Animated GIFs (first frame is used for the canvas drawing)
+- MP4 clips (looped in-app)
 
 ---
 
